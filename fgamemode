@@ -1,0 +1,273 @@
+#!/bin/sh
+##########################################################################################
+# By Diego Cardenas "The Samedog" under GNU GENERAL PUBLIC LICENSE Version 2, June 1991
+# (www.gnu.org/licenses/old-licenses/gpl-2.0.html) e-mail: the.samedog[]gmail.com.
+# https://github.com/samedog/wine-builder
+##########################################################################################
+
+INT='^[0-9]+$'
+DETECTED=""
+GAME_DATABASE="/usr/share/fgamemode/games.txt"
+PID=""
+
+if [[ -f "/etc/rc.d/PUPSTATE" ]]; then
+	PUPPY=1
+	echo 'Running on Puppy Linux or a "Pupplet" distro.'
+else
+	##TODO: add support for other distros maybe?? dunno
+	PUPPY=0
+	echo "Running an unsupported distro daemon will stop now"
+	exit
+fi
+
+function POWER_MIZER(){
+	CURR_PO_MIZER=$(nvidia-settings -q GpuPowerMizerMode | grep -i attribute | rev | cut -d' ' -f1 | rev | sed 's/\.//g')
+	if [ $CURR_PO_MIZER -ne 1 ];then
+		nvidia-settings -a "GpuPowerMizerMode=1" | sed '/^$/d' | cut -c2-
+		SET_PWM=1
+	else
+		SET_PWM=0
+	fi
+}
+
+
+function find_game_pid() {
+	PID=$(pgrep "$EXEC_NAME")
+}
+
+function DISK_detect(){
+	##TODO: ADD DETECTION FOR C: D: AND SIMILAR DRIVE LETTERS
+	GAME_PID="$1"
+	EXEC_NAME="$2"
+	if [ $PUPPY == 1 ]; then
+		BINARY_type $EXEC_NAME
+		if [ $EXEC_FLAG == 2 ];then
+			GAME_PATH=$( cat /proc/$GAME_PID/cmdline | cut -d':' -f 2)
+			GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
+
+		else
+			GAME_PATH=$( cat /proc/$GAME_PID/cmdline)		
+		fi
+		
+		if [[ "$GAME_PATH" == *"mnt"* ]];then
+			GAME_DISK=$(echo $GAME_PATH | sed 's+/mnt/++g' | cut -d'/' -f 1)
+		else
+			#running on /, gotta determine what disk is "/" on
+			GAME_DISK=$(head -n 1 /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev)
+		fi
+		if [[ $GAME_DISK != *"nvme"* ]];then
+			NVME=0
+			echo "game running on an hdd"
+			COUNT=$(echo $GAME_PATH | grep -o "/" | wc -l)
+			IFS='/' read -ra field <<< "$GAME_PATH"
+			for i in "${field[@]}"
+			do 
+				if [[ $i =~ ^sd[a-z]+[0-9]*$ ]];then
+					GAME_DISK="$i"
+				fi
+			done
+			HDD_sched $GAME_DISK ## pass to hdd scheduler function
+		else
+			echo "game running on a nvme sdd, no need for re-schedule"
+			NVME=1
+		fi
+	else
+		true
+	fi
+	
+}
+function GPU_detect(){
+	NV_prob_flag=0
+	IT_prob_flag=0
+	AMD_prob_flag=0
+	GPU_probable_vendor="$(cat /var/log/Xorg.0.log | grep glx | grep vendor) | grep -v \"X.Org\""
+	
+	if echo $GPU_probable_vendor | grep -iqF "nvidia";then
+		echo "Probably using an NVIDIA GPU"
+		NV_prob_flag=1
+	elif echo $GPU_probable_vendor | grep -iqF "intel";then
+		echo "Probably using an Intel GPU"
+		IT_prob_flag=1
+	elif echo $GPU_probable_vendor | grep -iqF "amd";then
+		echo "Probably using an AMD GPU"
+		AMD_prob_flag=1
+	else
+		echo "No acceleted GPU or open source driver(?)"
+	fi
+
+	if [ $NV_prob_flag == 1 ];then
+		NV_try=$(nvidia-settings --v | grep "version")
+		if echo $NV_try | grep -iqF "nvidia";then
+			echo "Nvidia driver confirmed by nvidia-settings"
+			GPU="nvidia"
+		fi
+	elif [ $IT_prob_flag == 1 ];then
+		true
+		##to-do
+	elif [ $AMD_prob_flag == 1 ];then
+		true
+		##to-do
+	fi
+
+}
+
+function HDD_sched(){
+	GAME_DISK="$1"
+	GAME_DISK_ROOT=$(echo $GAME_DISK | sed 's/[0-9]*//g')
+	SCHEDS=$(cat /sys/block/$GAME_DISK_ROOT/queue/scheduler)
+	ORIG_SCHED=$(echo $SCHEDS | grep -oP '\[.*?\]' | sed 's/[][]//g')
+	SCHED_LIST=$(echo $SCHEDS | sed 's/[][]//g')
+	echo "Current scheduler is: $ORIG_SCHED"s
+	if [[ $ORIG_SCHED != "kyber" ]] && [[ $ORIG_SCHED != "bfq" ]];then
+		SET_IOSCHD=1
+		if [[ "$SCHED_LIST" == *"bfq"* ]];then
+			echo "Setting I/O scheduler: bfq"
+			echo bfq > /sys/block/"$GAME_DISK_ROOT"/queue/scheduler
+			CURR_SCHED="bfq"
+		elif [[ "$SCHED_LIST" == *"kyber"* ]];then
+			echo "Setting I/O scheduler: kyber"
+			echo kyber > /sys/block/"$GAME_DISK_ROOT"/queue/scheduler
+			CURR_SCHED="kyber"
+		elif [[ "$SCHED_LIST" == *"mq-deadline"* ]];then
+			echo "Setting I/O scheduler: mq-deadlines"
+			echo mq-deadline > /sys/block/"$GAME_DISK_ROOT"/queue/scheduler
+			CURR_SCHED="mq-deadline"
+		else
+			SET_IOSCHD=0
+		fi
+	fi
+}
+
+function BINARY_type(){
+	EXEC_NAME="$1"
+	if [ $EXEC_NAME == *".exe" ];then
+		EXEC_FLAG=2
+	else
+		EXEC_FLAG=1
+	fi	
+}
+
+function detector() {
+	EXEC_NAME="$1"
+	find_game_pid "$EXEC_NAME"
+	GAME_PID=$PID
+	if [[ $GAME_PID =~ $INT ]] ; then
+		DETECTED="$2"
+		echo "$DETECTED detected entering game mode"
+		DISK_detect $GAME_PID $EXEC_NAME
+		
+		## After some research Fallout 76 seems to be caught in a priority inversion issue
+		## so i'm adjusting some vaues manually instead the default ones
+		if echo $EXEC_NAME | grep -iqF "fallout76";then
+			PR_IN_FLAG=1
+		else
+			PR_IN_FLAG=0
+		fi
+		
+		##this will only work on puppylinux based distros OR if you are not scared of root, GG
+		##we chek the current CPU governor and ensure it's set to performance
+		ORIG_GOVN=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+		if [ $ORIG_GOVN != "performance" ];then
+			echo "Setting performance CPU governor"
+			for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
+				echo "performance" > "$i"/cpufreq/scaling_governor
+			done
+			SET_PERF=1 #so we get bac toprevious governor later
+		else
+			SET_PERF=0
+		fi
+		if [ $PR_IN_FLAG == 1 ];then
+			echo "renicing $GAME_NAME to -5"
+			renice -n -5 -p $GAME_PID
+		else
+			##renice the game process, default is renice to -15
+			echo "renicing $GAME_NAME to -20"
+			renice -n -20 -p $GAME_PID
+		fi
+
+		##if the kernel supports low-latency scheduling we use SCHED_ISO to avoid SCHED_RR because
+		##it can cause weird behaviour if the program hangs
+		MuQSS=$(dmesg | grep -i muqss | grep -i Kolivas | cut -d' ' -f1)
+		if [[ $MuQSS == "MuQSS" ]];then
+			if [ $PR_IN_FLAG == 1 ];then
+				ISO_cpu=0
+			else
+				echo "setting CPU sched to SCHED_ISO"
+				schedtool -I $GAME_PID
+				if [ "$?" -eq 0 ];then
+					echo 95 > /proc/sys/kernel/iso_cpu
+					ISO_cpu=1
+				else
+					ISO_cpu=0
+				fi
+			fi
+		fi
+
+		##we set the program to realtime on highest priority, this plus bfq or kyber bumps the
+		##performance A LOT on mehcanical hdds 
+		WHOAMI=$(whoami)
+		if [[ $WHOAMI == "root" ]] && [[ $NVME == 0 ]];then
+			echo "setting ioprio to realtime" 
+			ionice -c 1 -n 0 -p $GAME_PID
+		fi
+		
+		## We set the powermizer level for nvidia gpus
+		if [ $GPU == "nvidia" ];then
+			echo "setting Power Mizer to max performance" 
+			POWER_MIZER
+		fi
+
+		break ##break the search loop
+		
+	else
+		DETECTED=""
+	fi
+}
+
+function detector_wrapper(){
+	if [ "$DETECTED" == "" ];then
+		while IFS= read -r GAME
+		do
+			GAME_EXEC=$(echo $GAME | cut -d'|' -f1)
+			GAME_NAME=$(echo $GAME | cut -d'|' -f2)
+			detector "$GAME_EXEC" "$GAME_NAME" 
+			sleep 1
+		done < "$GAME_DATABASE"
+	else
+		find_game_pid "$GAME"
+		if [[ $PID != "" ]] ; then
+			sleep 5
+		else
+			echo "$GAME_NAME closed"
+			if [ $NVME == 0 ];then 
+				if [ $SET_IOSCHD == 1 ];then
+					echo "Reverting to original I/O scheduler: $ORIG_SCHED"
+					echo $ORIG_SCHED > /sys/block/"$GAME_DISK_ROOT"/queue/scheduler
+				fi
+			fi
+			if [ $SET_PERF == 1 ];then
+				echo "Reverting to original CPU governor: $ORIG_GOVN"
+				for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
+					echo "$ORIG_GOVN" > "$i"/cpufreq/scaling_governor
+				done
+			fi
+			if [ $ISO_cpu == 1 ];then
+				echo "Reverting iso_cpu to default value 70"
+				echo 70 > /proc/sys/kernel/iso_cpu 
+			fi
+			if [ $GPU == "nvidia" ];then
+				echo "Reverting to original Power Mizer level"
+				nvidia-settings -a "GpuPowerMizerMode=$CURR_PO_MIZER" | sed '/^$/d' | cut -c2-
+			fi
+			echo "back into detection mode" 
+			DETECTED=""
+		fi
+	fi
+}
+
+GPU_detect
+
+while true
+do
+	detector_wrapper 
+done

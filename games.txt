@@ -1,0 +1,22 @@
+Fallout76|Fallout 76
+Control_DX11|Control
+Control_DX12|Control
+Cq.bin.x86|Costume Quest
+EliteDangerous64.exe|Elite Dangerous
+Cq2|Costume Quest 2
+Empyrion.exe|Empyrion
+hollow_knight.x86_64|Hollow Knight
+kenshi_x64.exe|Kenshi
+LC2.exe|Lara Croft and the Temple of Osiris
+MewnBase.exe|MewnBase
+MuseDash.exe|Muse Dash
+Neverinth.exe|Neverinth
+Outward.exe|Outward
+OxygenNotIncluded|Oxygen Not Included
+StardewValley.bin.x86_64|Stardew Valley
+StardewValley.bin.x86|Stardew Valley
+StateOfDecay2.exe|State Of Decay 2
+Super Animal Royale.exe|Super Animal Royale
+Torchlight2.bin.x86_64|Torchlight 2
+Torchlight2.bin.x86|Torchlight 2
+Zengeon.exe|Zengeon
