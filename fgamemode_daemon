@@ -4,48 +4,48 @@ PIDFILE="/var/run/fgamemode/fgamemode.pid"
 
 
 fgamemode_start() {
-	PID=$(pgrep fgamemode)
-	if [ ! -d "/var/log/fgamemode" ];then
-		mkdir /var/log/fgamemode
-	fi
-	if [ ! -d "/var/run/fgamemode" ];then
-		mkdir /var/run/fgamemode
-	fi
-	if [[ $PID =~ ^[0-9]+$ ]];then
-		echo "already running"
-	else
-		/root/my-applications/bin/fgamemode 2>&1 > /var/log/fgamemode/log.txt &
-		PID=$(pgrep fgamemode)
-		echo "$PID" > "$PIDFILE"
-		echo "fgamemode started"
-	fi
-	
+    PID=$(pgrep fgamemode)
+    if [ ! -d "/var/log/fgamemode" ];then
+        mkdir /var/log/fgamemode
+    fi
+    if [ ! -d "/var/run/fgamemode" ];then
+        mkdir /var/run/fgamemode
+    fi
+    if [[ $PID =~ ^[0-9]+$ ]];then
+        echo "already running"
+    else
+        /usr/bin/fgamemode 2>&1 > /var/log/fgamemode/log.txt &
+        PID=$(pgrep fgamemode)
+        echo "$PID" > "$PIDFILE"
+        echo "fgamemode started"
+    fi
+    
 }
 
 fgamemode_stop() {
-	PID=$(cat $PIDFILE 2>/dev/null)
-	kill -TERM $PID
-	RUNNING=$(ps ax -o pid,cmd | grep -i $PID | grep -v grep)
-	if [ z $RUNNING ];then
-		echo "fgamemode stopped"
-		rm -rf "$PIDFILE"
-	fi
+    PID=$(cat $PIDFILE 2>/dev/null)
+    kill -TERM $PID
+    RUNNING=$(ps ax -o pid,cmd | grep -i $PID | grep -v grep)
+    if [ z $RUNNING ];then
+        echo "fgamemode stopped"
+        rm -rf "$PIDFILE"
+    fi
 }
 
 fgamemode_restart() {
-	fgamemode_stop
-	sleep 1
-	fgamemode_start
+    fgamemode_stop
+    sleep 1
+    fgamemode_start
 }
 
 fgamemode_state() {
-	PID_STATE=$(pgrep fgamemode)
-	PID_FILE_STATE=$(cat $PIDFILE 2>/dev/null) 
-	if [[ -z $PID_STATE ]] || [[ -z $PID_FILE_STATE ]];then
-		echo "daemon is stopped"
-	else
-		echo "daemon is running, PID: $PID_FILE_STATE"
-	fi
+    PID_STATE=$(pgrep fgamemode)
+    PID_FILE_STATE=$(cat $PIDFILE 2>/dev/null) 
+    if [[ -z $PID_STATE ]] || [[ -z $PID_FILE_STATE ]];then
+        echo "daemon is stopped"
+    else
+        echo "daemon is running, PID: $PID_FILE_STATE"
+    fi
 }
 case "$1" in
 'start')
@@ -62,10 +62,10 @@ case "$1" in
   ;;
 *)
 echo "Usage:"
-echo "/etc/init.d/fgamemode start  <<-- starts the fgamemode daemon"	
-echo "/etc/init.d/fgamemode stop  <<-- stops the fgamemode daemon"	
-echo "/etc/init.d/fgamemode restart  <<-- restarts the fgamemode daemon"	
-echo "/etc/init.d/fgamemode state  <<-- checks the fgamemode daemon"	
+echo "/etc/init.d/fgamemode start       <<-- starts the fgamemode daemon"   
+echo "/etc/init.d/fgamemode stop        <<-- stops the fgamemode daemon"    
+echo "/etc/init.d/fgamemode restart     <<-- restarts the fgamemode daemon" 
+echo "/etc/init.d/fgamemode state       <<-- checks the fgamemode daemon"   
   ;;
 
 esac 
