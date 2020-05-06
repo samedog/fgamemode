@@ -1,4 +1,4 @@
-simple gamemode daemon for FranknepupLinux and/or Puppy Linux
+simple gamemode daemon for FrankenpupLinux and/or Puppy Linux
 
 Works better wth my patched 5.6.8 kernel and aims to milk every single drop of performance the system can give.
 
