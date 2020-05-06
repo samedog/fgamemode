@@ -4,4 +4,4 @@ Works better with my patched 5.6.8 kernel (to provide SCHED_ISO) and aims to mil
 
 Requires ionice and renice (or equivalent busybox applets) and schedtool for SCHED_ISO (https://github.com/jlelli/schedtool-dl)
 
-Quite similar to https://github.com/FeralInteractive/gamemode but running in the background with automatic detection and won't work on systems without root permissions since Puppy and it's derivatives run as root.
+Quite similar to https://github.com/FeralInteractive/gamemode but running in the background with automatic detection and won't work without root permissions since Puppy and it's derivatives run as root.
