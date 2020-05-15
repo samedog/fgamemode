@@ -23,7 +23,7 @@ fi
 function POWER_MIZER(){
     CURR_PO_MIZER=$(nvidia-settings -q GpuPowerMizerMode | grep -i attribute | rev | cut -d' ' -f1 | rev | sed 's/\.//g')
     if [ $CURR_PO_MIZER -ne 1 ];then
-        nvidia-settings -a "GpuPowerMizerMode=1" | sed '/^$/d' | cut -c2-
+        nvidia-settings -a "GpuPowerMizerMode=1" | sed '/^$/d'
         SET_PWM=1
     else
         SET_PWM=0
@@ -39,26 +39,26 @@ function DISK_detect(){
     ##TODO: ADD DETECTION FOR C: D: AND SIMILAR DRIVE LETTERS
     GAME_PID="$1"
     EXEC_NAME="$2"
+    EXEC_FLAG=0
     if [ $PUPPY == 1 ]; then
         BINARY_type $EXEC_NAME
         if [ $EXEC_FLAG == 2 ];then
             GAME_PATH=$( cat /proc/$GAME_PID/cmdline | cut -d':' -f 2)
-            GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
-
+            GAME_PATH=$( echo $GAME_PATH | sed 's+\\+/+g' ) #normalize
         else
             GAME_PATH=$( cat /proc/$GAME_PID/cmdline)       
         fi
         
         if [[ "$GAME_PATH" == *"mnt"* ]];then
-            GAME_DISK=$(echo $GAME_PATH | sed 's+/mnt/++g' | cut -d'/' -f 1)
+            GAME_DISK=$( echo $GAME_PATH | sed 's+/mnt/++g' | cut -d'/' -f 1 )
         else
             #running on /, gotta determine what disk is "/" on
-            GAME_DISK=$(head -n 1 /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev)
+            GAME_DISK=$( head -n 1 /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
         fi
         if [[ $GAME_DISK != *"nvme"* ]];then
             NVME=0
             echo "game running on an hdd"
-            COUNT=$(echo $GAME_PATH | grep -o "/" | wc -l)
+            COUNT=$( echo $GAME_PATH | grep -o "/" | wc -l )
             IFS='/' read -ra field <<< "$GAME_PATH"
             for i in "${field[@]}"
             do 
@@ -117,7 +117,6 @@ function HDD_sched(){
     SCHEDS=$(cat /sys/block/$GAME_DISK_ROOT/queue/scheduler)
     ORIG_SCHED=$(echo $SCHEDS | grep -oP '\[.*?\]' | sed 's/[][]//g')
     SCHED_LIST=$(echo $SCHEDS | sed 's/[][]//g')
-    echo "Current scheduler is: $ORIG_SCHED"s
     if [[ $ORIG_SCHED != "kyber" ]] && [[ $ORIG_SCHED != "bfq" ]];then
         SET_IOSCHD=1
         if [[ "$SCHED_LIST" == *"bfq"* ]];then
@@ -140,7 +139,7 @@ function HDD_sched(){
 
 function BINARY_type(){
     EXEC_NAME="$1"
-    if [ $EXEC_NAME == *".exe" ];then
+    if [[ "$EXEC_NAME" == *".exe"* ]];then
         EXEC_FLAG=2
     else
         EXEC_FLAG=1
@@ -155,7 +154,7 @@ function detector() {
         DETECTED="$2"
         echo "$DETECTED detected entering game mode"
         DISK_detect $GAME_PID $EXEC_NAME
-        
+
         ## After some research Fallout 76 seems to be caught in a priority inversion issue
         ## so i'm adjusting some vaues manually instead the default ones
         if echo $EXEC_NAME | grep -iqF "fallout76";then
@@ -257,7 +256,7 @@ function detector_wrapper(){
             fi
             if [ $GPU == "nvidia" ];then
                 echo "Reverting to original Power Mizer level"
-                nvidia-settings -a "GpuPowerMizerMode=$CURR_PO_MIZER" | sed '/^$/d' | cut -c2-
+                nvidia-settings -a "GpuPowerMizerMode=$CURR_PO_MIZER" | sed '/^$/d'
             fi
             echo "back into detection mode" 
             DETECTED=""
