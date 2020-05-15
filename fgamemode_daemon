@@ -1,10 +1,10 @@
 #!/bin/sh
 #
 PIDFILE="/var/run/fgamemode/fgamemode.pid"
-
+PID=$(pgrep -x fgamemode)
 
 fgamemode_start() {
-    PID=$(pgrep fgamemode)
+    
     if [ ! -d "/var/log/fgamemode" ];then
         mkdir /var/log/fgamemode
     fi
@@ -12,15 +12,15 @@ fgamemode_start() {
         mkdir /var/run/fgamemode
     fi
     if [[ $PID =~ ^[0-9]+$ ]];then
-        echo "already running"
+        echo "already running with PID: $PID"
     else
         /usr/bin/fgamemode 2>&1 > /var/log/fgamemode/log.txt &
-        PID=$(pgrep fgamemode)
+        PID=$(pgrep -x fgamemode)
         echo "$PID" > "$PIDFILE"
         echo "fgamemode started"
     fi
     
-}
+} 
 
 fgamemode_stop() {
     PID=$(cat $PIDFILE 2>/dev/null)
