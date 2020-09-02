@@ -21,9 +21,9 @@ else
 fi
 
 function POWER_MIZER(){
-    CURR_PO_MIZER=$(nvidia-settings -q GpuPowerMizerMode | grep -i attribute | rev | cut -d' ' -f1 | rev | sed 's/\.//g')
+    CURR_PO_MIZER=$(nvidia-settings -q [gpu]/GpuPowerMizerMode | grep -i attribute | rev | cut -d' ' -f1 | rev | sed 's/\.//g')
     if [ $CURR_PO_MIZER -ne 1 ];then
-        nvidia-settings -a "GpuPowerMizerMode=1" | sed '/^$/d'
+        nvidia-settings -a "GpuPowerMizerMode=1"
         SET_PWM=1
     else
         SET_PWM=0
@@ -32,7 +32,7 @@ function POWER_MIZER(){
 
 
 function find_game_pid() {
-    PID=$(pgrep "$EXEC_NAME")
+    PID=$(pgrep -f "$EXEC_NAME")
 }
 
 function DISK_detect(){
@@ -230,8 +230,9 @@ function detector_wrapper(){
             GAME_EXEC=$(echo $GAME | cut -d'|' -f1)
             GAME_NAME=$(echo $GAME | cut -d'|' -f2)
             detector "$GAME_EXEC" "$GAME_NAME" 
-            sleep 1
+            #sleep 0.2
         done < "$GAME_DATABASE"
+        sleep 5
     else
         find_game_pid "$GAME"
         if [[ $PID != "" ]] ; then
@@ -256,7 +257,7 @@ function detector_wrapper(){
             fi
             if [ $GPU == "nvidia" ];then
                 echo "Reverting to original Power Mizer level"
-                nvidia-settings -a "GpuPowerMizerMode=$CURR_PO_MIZER" | sed '/^$/d'
+                nvidia-settings -a "[gpu]/GpuPowerMizerMode=$CURR_PO_MIZER"
             fi
             echo "back into detection mode" 
             DETECTED=""
