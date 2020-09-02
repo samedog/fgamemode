@@ -1,6 +1,7 @@
-Fallout76|Fallout 76
-Control_DX11|Control
-Control_DX12|Control
+Fallout76.exe|Fallout 76
+Warframe.x64.exe|Warframe
+Control_DX11.exe|Control
+Control_DX12.exe|Control
 Cq.bin.x86|Costume Quest
 EliteDangerous64.exe|Elite Dangerous
 Cq2|Costume Quest 2
