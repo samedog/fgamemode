@@ -5,6 +5,8 @@
 # https://github.com/samedog/fgamemode
 ##########################################################################################
 # This now (barely) runs on Pop!_OS , currently fixing a lot of issues
+# PUPPY = 1 PuppyLinux or pupy based distro
+# PUPPY = 2 POP!_OS
 
 INT='^[0-9]+$'
 DETECTED=""
@@ -14,7 +16,7 @@ PID=""
 if [[ -f "/etc/os-release" ]]; then
     if [[ $(cat /etc/os-release | grep -m1 "NAME" | cut -d'=' -f'2') == *"Pop!_OS"* ]];then
 	echo 'Running on Pop!_OS ( supported distro )'
-	PUPPY=1
+	PUPPY=2
     fi
 elif [[ -f "/etc/rc.d/PUPSTATE" ]]; then
     PUPPY=1
@@ -37,11 +39,6 @@ function POWER_MIZER(){
 }
 
 
-function find_game_pid() {
-	true
-
-}
-
 function DISK_detect(){
     ##TODO: ADD DETECTION FOR C: D: AND SIMILAR DRIVE LETTERS
     GAME_PID="$1"
@@ -52,18 +49,25 @@ function DISK_detect(){
         if [ $EXEC_FLAG == 2 ];then
             GAME_PATH=$(cat /proc/$GAME_PID/cmdline | cut -d':' -f'2')
             GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
-            echo " nomralized $GAME_PATH"
+            #echo "normalized $GAME_PATH"
         else
             GAME_PATH=$( cat /proc/$GAME_PID/cmdline)       
         fi
         
         if [[ "$GAME_PATH" == *"mnt"* ]];then
             GAME_DISK=$( echo $GAME_PATH | sed 's+/mnt/++g' | cut -d'/' -f 1 )
+        elif [[ "$GAME_PATH" == *"media"* ]];then
+            GAME_DISK=$( echo $GAME_PATH | sed 's+/media/++g' | cut -d'/' -f 1 )
         else
             #running on /, gotta determine what disk is "/" on
-            GAME_DISK=$( head -n 1 /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
+            if [[ $PUPPY -eq 2 ]];then
+            	GAME_DISK=$( cat /etc/mtab | grep -w "/" | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
+            else
+                GAME_DISK=$( head -n 1 /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
+            fi
         fi
-        if [[ $GAME_DISK != *"nvme"* ]];then
+        
+        if [[ "$GAME_DISK" != *"nvme"* ]];then
             NVME=0
             echo "game running on an hdd"
             COUNT=$( echo $GAME_PATH | grep -o "/" | wc -l )
@@ -159,7 +163,7 @@ function detector() {
 
 	    if [[ $GAME_EXEC == *".exe"  ]]; then
 		#echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
-		PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep "Z:" | awk '{print $1}')
+		PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep "Z:" | grep -v log | awk '{print $1}')
 	    else
 	    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
 		#echo "find_game_pid just found $PID for $EXEC_NAME"
@@ -168,8 +172,42 @@ function detector() {
 
 }
 
-function detector_wrapper(){
-	true
+function temp_control() {
+AMD_TEMP=$(sensors | grep -i "tctl" | cut -d'+' -f2 | cut -d"." -f1)
+AMD_BOOST=/sys/devices/system/cpu/cpufreq/boost
+AMD_BOOST_NOW=$(cat $AMD_BOOST)
+INTEL_TEMP=0
+    if [[ $1 != "" ]];then
+    	echo "ensuring boost is enabled after game is closed"
+	if [[ $AMD_TEMP -gt 0 ]];then
+    	     echo "1" > "$AMD_BOOST"
+	elif [[ $INTEL_TEMP -gt 0 ]];then
+	    #todo
+	    true
+	fi
+    else 
+	if [[ $AMD_TEMP -gt 0 ]];then
+            #92° is the safe spot (according to me) it means the tenmp is rapidly scaling
+            #and may be near to 95°+ which is no good at all, we can sacrifice a bit of
+            #performance to keep the CPU safe.
+	    if [[ $AMD_TEMP -ge 95 ]] && [[ $AMD_BOOST_NOW -eq 1 ]];then
+	    	#expect 10%~15% less performance if the game is multi-thread heavy
+	    	#I strongly believe this is quite a good trade off.
+	    	echo "disabling boost to avoid overheat or thermal throttling"
+	    	echo "0" > "$AMD_BOOST"
+	    fi
+	    #knowing my ryzen, 65° is a safe temp to turn boost on again it means the game is
+	    #doing non heavy cpu stuff and we can afford to give more performance in exchange 
+	    #for some temp increase.
+	    if [[ $AMD_TEMP -lt 65  ]] && [[ $AMD_BOOST_NOW -eq 0 ]];then
+		echo "Heavy thermal load seems to have ended, re-enabling boost"
+	    	echo "1" > "$AMD_BOOST"
+	    fi 
+	elif [[ $INTEL_TEMP -gt 0 ]];then
+	    #todo
+	    true
+	fi
+    fi
 }
 
 GPU_detect
@@ -177,6 +215,12 @@ GPU_detect
 while true
 do
 #echo "entering: Wrapper"
+#####
+#temp monitor because no one is happy with a blowed cpu right?
+
+
+
+###
     if [ "$DETECTED" == "" ];then
         while IFS= read -r GAME
         do
@@ -224,20 +268,14 @@ do
 		##if the kernel supports low-latency scheduling we use SCHED_ISO or SCHED_NORMAL
 		## to avoid SCHED_RR because it can cause weird behaviour if the program hangs
 		
-		SCHED_NORMAL=$(dmesg | grep -i "tt cpu" | grep -i Kolivas | cut -d' ' -f1)
+		SCHED_NORMAL=$(dmesg | grep -i "tt cpu")
 		MuQSS=$(dmesg | grep -i muqss | grep -i Kolivas | cut -d' ' -f1)
-		if [[ $MuQSS == "TT CPU" ]];then
+		if [[ $SCHED_NORMAL == *"TT CPU"* ]];then
 		    if [ $PR_IN_FLAG == 1 ];then
-			ISO_cpu=0
+			TT_cpu=0
 		    else
-			echo "setting CPU sched to SCHED_ISO"
+			echo "setting CPU sched to SCHED_NORMAL"
 			schedtool -N $GAME_PID
-			if [ "$?" -eq 0 ];then
-			    echo 95 > /proc/sys/kernel/iso_cpu
-			    ISO_cpu=1
-			else
-			    ISO_cpu=0
-			fi
 		    fi
 
 		elif [[ $MuQSS == "MuQSS" ]];then
@@ -257,7 +295,9 @@ do
 
 		##we set the program to realtime on highest priority, this plus bfq or kyber bumps the
 		##performance A LOT on mehcanical hdds 
+
 		WHOAMI=$(whoami)
+		
 		if [[ $WHOAMI == "root" ]] && [[ $NVME == 0 ]];then
 		    echo "setting ioprio to realtime" 
 		    ionice -c 1 -n 0 -p $GAME_PID
@@ -279,12 +319,14 @@ do
         done < "$GAME_DATABASE"
         sleep 5
     else
-
 	detector "$GAME"
         if [[ $PID != "" ]] ; then
+            ##temp control only when a game is running
+            temp_control
             sleep 5
         else
             echo "$GAME_NAME closed"
+            temp_control "on"
             if [ $NVME == 0 ];then 
                 if [ $SET_IOSCHD == 1 ];then
                     echo "Reverting to original I/O scheduler: $ORIG_SCHED"
