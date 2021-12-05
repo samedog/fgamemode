@@ -1,16 +1,22 @@
-#!/bin/sh
+#!/bin/bash
 ##########################################################################################
 # By Diego Cardenas "The Samedog" under GNU GENERAL PUBLIC LICENSE Version 2, June 1991
 # (www.gnu.org/licenses/old-licenses/gpl-2.0.html) e-mail: the.samedog[]gmail.com.
-# https://github.com/samedog/wine-builder
+# https://github.com/samedog/fgamemode
 ##########################################################################################
+# This now (barely) runs on Pop!_OS , currently fixing a lot of issues
 
 INT='^[0-9]+$'
 DETECTED=""
 GAME_DATABASE="/usr/share/fgamemode/games.txt"
 PID=""
 
-if [[ -f "/etc/rc.d/PUPSTATE" ]]; then
+if [[ -f "/etc/os-release" ]]; then
+    if [[ $(cat /etc/os-release | grep -m1 "NAME" | cut -d'=' -f'2') == *"Pop!_OS"* ]];then
+	echo 'Running on Pop!_OS ( supported distro )'
+	PUPPY=1
+    fi
+elif [[ -f "/etc/rc.d/PUPSTATE" ]]; then
     PUPPY=1
     echo 'Running on Puppy Linux or a "Pupplet" distro.'
 else
@@ -32,7 +38,8 @@ function POWER_MIZER(){
 
 
 function find_game_pid() {
-    PID=$(pgrep -f "$EXEC_NAME")
+	true
+
 }
 
 function DISK_detect(){
@@ -43,8 +50,9 @@ function DISK_detect(){
     if [ $PUPPY == 1 ]; then
         BINARY_type $EXEC_NAME
         if [ $EXEC_FLAG == 2 ];then
-            GAME_PATH=$( cat /proc/$GAME_PID/cmdline | cut -d':' -f 2)
-            GAME_PATH=$( echo $GAME_PATH | sed 's+\\+/+g' ) #normalize
+            GAME_PATH=$(cat /proc/$GAME_PID/cmdline | cut -d':' -f'2')
+            GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
+            echo " nomralized $GAME_PATH"
         else
             GAME_PATH=$( cat /proc/$GAME_PID/cmdline)       
         fi
@@ -147,94 +155,132 @@ function BINARY_type(){
 }
 
 function detector() {
-    EXEC_NAME="$1"
-    find_game_pid "$EXEC_NAME"
-    GAME_PID=$PID
-    if [[ $GAME_PID =~ $INT ]] ; then
-        DETECTED="$2"
-        echo "$DETECTED detected entering game mode"
-        DISK_detect $GAME_PID $EXEC_NAME
+	#EXEC_NAME="$1"
 
-        ## After some research Fallout 76 seems to be caught in a priority inversion issue
-        ## so i'm adjusting some vaues manually instead the default ones
-        if echo $EXEC_NAME | grep -iqF "fallout76";then
-            PR_IN_FLAG=1
-        else
-            PR_IN_FLAG=0
-        fi
-        
-        ##this will only work on puppylinux based distros OR if you are not scared of root, GG
-        ##we chek the current CPU governor and ensure it's set to performance
-        ORIG_GOVN=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-        if [ $ORIG_GOVN != "performance" ];then
-            echo "Setting performance CPU governor"
-            for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
-                echo "performance" > "$i"/cpufreq/scaling_governor
-            done
-            SET_PERF=1 #so we get bac toprevious governor later
-        else
-            SET_PERF=0
-        fi
-        if [ $PR_IN_FLAG == 1 ];then
-            echo "renicing $GAME_NAME to -5"
-            renice -n -5 -p $GAME_PID
-        else
-            ##renice the game process, default is renice to -15
-            echo "renicing $GAME_NAME to -20"
-            renice -n -20 -p $GAME_PID
-        fi
+	    if [[ $GAME_EXEC == *".exe"  ]]; then
+		#echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
+		PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep "Z:" | awk '{print $1}')
+	    else
+	    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
+		#echo "find_game_pid just found $PID for $EXEC_NAME"
+	    fi
+	    #echo "found PID: $PID"
 
-        ##if the kernel supports low-latency scheduling we use SCHED_ISO to avoid SCHED_RR because
-        ##it can cause weird behaviour if the program hangs
-        MuQSS=$(dmesg | grep -i muqss | grep -i Kolivas | cut -d' ' -f1)
-        if [[ $MuQSS == "MuQSS" ]];then
-            if [ $PR_IN_FLAG == 1 ];then
-                ISO_cpu=0
-            else
-                echo "setting CPU sched to SCHED_ISO"
-                schedtool -I $GAME_PID
-                if [ "$?" -eq 0 ];then
-                    echo 95 > /proc/sys/kernel/iso_cpu
-                    ISO_cpu=1
-                else
-                    ISO_cpu=0
-                fi
-            fi
-        fi
-
-        ##we set the program to realtime on highest priority, this plus bfq or kyber bumps the
-        ##performance A LOT on mehcanical hdds 
-        WHOAMI=$(whoami)
-        if [[ $WHOAMI == "root" ]] && [[ $NVME == 0 ]];then
-            echo "setting ioprio to realtime" 
-            ionice -c 1 -n 0 -p $GAME_PID
-        fi
-        
-        ## We set the powermizer level for nvidia gpus
-        if [ $GPU == "nvidia" ];then
-            echo "setting Power Mizer to max performance" 
-            POWER_MIZER
-        fi
-
-        break ##break the search loop
-        
-    else
-        DETECTED=""
-    fi
 }
 
 function detector_wrapper(){
+	true
+}
+
+GPU_detect
+
+while true
+do
+#echo "entering: Wrapper"
     if [ "$DETECTED" == "" ];then
         while IFS= read -r GAME
         do
             GAME_EXEC=$(echo $GAME | cut -d'|' -f1)
             GAME_NAME=$(echo $GAME | cut -d'|' -f2)
-            detector "$GAME_EXEC" "$GAME_NAME" 
+	    #echo "trying to detect $GAME_EXEC $GAME_NAME"
+            detector "$GAME_EXEC"
+            ###################
+	
+	    GAME_PID=$PID
+	    if [[ $GAME_PID =~ $INT ]] ; then
+		DETECTED="$GAME_NAME"
+		echo "$DETECTED detected entering game mode"
+		DISK_detect $GAME_PID $GAME_EXEC
+
+		## After some research Fallout 76 seems to be caught in a priority inversion issue
+		## so i'm adjusting some vaues manually instead the default ones
+		if echo $GAME_EXEC | grep -iqF "fallout76";then
+		    PR_IN_FLAG=1
+		else
+		    PR_IN_FLAG=0
+		fi
+		
+		##this will only work on puppylinux based distros OR if you are not scared of root, GG
+		##we chek the current CPU governor and ensure it's set to performance
+		ORIG_GOVN=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+		if [ $ORIG_GOVN != "performance" ];then
+		    echo "Setting performance CPU governor"
+		    for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
+			echo "performance" > "$i"/cpufreq/scaling_governor
+		    done
+		    SET_PERF=1 #so we get bac toprevious governor later
+		else
+		    SET_PERF=0
+		fi
+		if [ $PR_IN_FLAG == 1 ];then
+		    echo "renicing $GAME_NAME to -5"
+		    renice -n -5 -p $GAME_PID
+		else
+		    ##renice the game process, default is renice to -15
+		    echo "renicing $GAME_NAME to -20"
+		    renice -n -20 -p $GAME_PID
+		fi
+
+		##if the kernel supports low-latency scheduling we use SCHED_ISO or SCHED_NORMAL
+		## to avoid SCHED_RR because it can cause weird behaviour if the program hangs
+		
+		SCHED_NORMAL=$(dmesg | grep -i "tt cpu" | grep -i Kolivas | cut -d' ' -f1)
+		MuQSS=$(dmesg | grep -i muqss | grep -i Kolivas | cut -d' ' -f1)
+		if [[ $MuQSS == "TT CPU" ]];then
+		    if [ $PR_IN_FLAG == 1 ];then
+			ISO_cpu=0
+		    else
+			echo "setting CPU sched to SCHED_ISO"
+			schedtool -N $GAME_PID
+			if [ "$?" -eq 0 ];then
+			    echo 95 > /proc/sys/kernel/iso_cpu
+			    ISO_cpu=1
+			else
+			    ISO_cpu=0
+			fi
+		    fi
+
+		elif [[ $MuQSS == "MuQSS" ]];then
+		    if [ $PR_IN_FLAG == 1 ];then
+			ISO_cpu=0
+		    else
+			echo "setting CPU sched to SCHED_ISO"
+			schedtool -I $GAME_PID
+			if [ "$?" -eq 0 ];then
+			    echo 95 > /proc/sys/kernel/iso_cpu
+			    ISO_cpu=1
+			else
+			    ISO_cpu=0
+			fi
+		    fi
+		fi
+
+		##we set the program to realtime on highest priority, this plus bfq or kyber bumps the
+		##performance A LOT on mehcanical hdds 
+		WHOAMI=$(whoami)
+		if [[ $WHOAMI == "root" ]] && [[ $NVME == 0 ]];then
+		    echo "setting ioprio to realtime" 
+		    ionice -c 1 -n 0 -p $GAME_PID
+		fi
+		
+		## We set the powermizer level for nvidia gpus
+		if [ $GPU == "nvidia" ];then
+		    echo "setting Power Mizer to max performance" 
+		    POWER_MIZER
+		fi
+
+		break ##break the search loop
+		
+	    else
+		DETECTED=""
+	    fi
+            #####################
             #sleep 0.2
         done < "$GAME_DATABASE"
         sleep 5
     else
-        find_game_pid "$GAME"
+
+	detector "$GAME"
         if [[ $PID != "" ]] ; then
             sleep 5
         else
@@ -263,11 +309,4 @@ function detector_wrapper(){
             DETECTED=""
         fi
     fi
-}
-
-GPU_detect
-
-while true
-do
-    detector_wrapper 
 done

@@ -10,4 +10,7 @@ cp -rf ./games.txt /usr/share/fgamemode/games.txt
 cp -rf ./fgamemode_daemon /etc/init.d/fgamemode_daemon
 chmod +x /etc/init.d/fgamemode_daemon
 
-/etc/init.d/fgamemode_daemon start
+systemctl start fgamemode_daemon 
+if [ "$?" -ne 0 ];then
+    /etc/init.d/fgamemode_daemon start
+fi
