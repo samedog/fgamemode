@@ -1,4 +1,4 @@
-simple gamemode daemon for FrankenpupLinux and/or Puppy Linux and now on Pop!_OS thru a series of horrible hacks :D (for Pop!_OS it requires iosched and ionice, both can be grabbed with apt)
+simple gamemode daemon for FrankenpupLinux and/or Puppy Linux and now on Pop!_OS thru a series of horrible hacks :D
 
 
 Works better with my patched 5.6.8 kernel (to provide SCHED_ISO) or Xanmod kernel on Pop!_OS and aims to milk every single drop of performance the system can give.
