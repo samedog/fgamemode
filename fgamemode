@@ -187,8 +187,8 @@ INTEL_TEMP=0
 	fi
     else 
 	if [[ $AMD_TEMP -gt 0 ]];then
-            #92° is the safe spot (according to me) it means the tenmp is rapidly scaling
-            #and may be near to 95°+ which is no good at all, we can sacrifice a bit of
+            #95° is the safe spot (according to me) it means the tenmp is rapidly scaling
+            #and may be near to 100° which is no good at all, we can sacrifice a bit of
             #performance to keep the CPU safe.
 	    if [[ $AMD_TEMP -ge 95 ]] && [[ $AMD_BOOST_NOW -eq 1 ]];then
 	    	#expect 10%~15% less performance if the game is multi-thread heavy

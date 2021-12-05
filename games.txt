@@ -22,3 +22,4 @@ Torchlight2.bin.x86_64|Torchlight 2
 Torchlight2.bin.x86|Torchlight 2
 Zengeon.exe|Zengeon
 eso64.exe|Elder Scrolls Online
+ForzaHorizon5.exe|Forza Horizon 5
