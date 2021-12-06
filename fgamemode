@@ -164,6 +164,9 @@ function detector() {
 	    if [[ $GAME_EXEC == *".exe"  ]]; then
 		#echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
 		PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep "Z:" | grep -v log | awk '{print $1}')
+		if [[ $PID == "" ]];then
+		    PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep "C:" | grep -v log | awk '{print $1}')
+		fi
 	    else
 	    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
 		#echo "find_game_pid just found $PID for $EXEC_NAME"

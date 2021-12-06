@@ -23,3 +23,5 @@ Torchlight2.bin.x86|Torchlight 2
 Zengeon.exe|Zengeon
 eso64.exe|Elder Scrolls Online
 ForzaHorizon5.exe|Forza Horizon 5
+Cyberpunk2077.exe|Cyberpunk 2077
+Gw2-64.exe|Guild Wars 2
