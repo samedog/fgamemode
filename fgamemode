@@ -14,7 +14,7 @@ GAME_DATABASE="/usr/share/fgamemode/games.txt"
 PID=""
 
 if [[ -f "/etc/os-release" ]]; then
-    if [[ $(cat /etc/os-release | grep -m1 "NAME" | cut -d'=' -f'2') == *"Pop!_OS"* ]];then
+    if [[ $(tail /etc/os-release | grep -m1 "NAME" | cut -d'=' -f'2') == *"Pop!_OS"* ]];then
 	echo 'Running on Pop!_OS ( supported distro )'
 	PUPPY=2
     fi
@@ -47,11 +47,11 @@ function DISK_detect(){
     if [ $PUPPY == 1 ]; then
         BINARY_type $EXEC_NAME
         if [ $EXEC_FLAG == 2 ];then
-            GAME_PATH=$(cat /proc/$GAME_PID/cmdline | cut -d':' -f'2')
+            GAME_PATH=$(tail /proc/$GAME_PID/cmdline | cut -d':' -f'2')
             GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
             #echo "normalized $GAME_PATH"
         else
-            GAME_PATH=$( cat /proc/$GAME_PID/cmdline)       
+            GAME_PATH=$( tail /proc/$GAME_PID/cmdline)       
         fi
         
         if [[ "$GAME_PATH" == *"mnt"* ]];then
@@ -61,7 +61,7 @@ function DISK_detect(){
         else
             #running on /, gotta determine what disk is "/" on
             if [[ $PUPPY -eq 2 ]];then
-            	GAME_DISK=$( cat /etc/mtab | grep -w "/" | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
+            	GAME_DISK=$( grep -w "/" /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
             else
                 GAME_DISK=$( head -n 1 /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
             fi
@@ -92,7 +92,7 @@ function GPU_detect(){
     NV_prob_flag=0
     IT_prob_flag=0
     AMD_prob_flag=0
-    GPU_probable_vendor="$(cat /var/log/Xorg.0.log | grep glx | grep vendor) | grep -v \"X.Org\""
+    GPU_probable_vendor="$(grep glx /var/log/Xorg.0.log | grep vendor) | grep -v \"X.Org\""
     
     if echo $GPU_probable_vendor | grep -iqF "nvidia";then
         echo "Probably using an NVIDIA GPU"
@@ -126,9 +126,9 @@ function GPU_detect(){
 function HDD_sched(){
     GAME_DISK="$1"
     GAME_DISK_ROOT=$(echo $GAME_DISK | sed 's/[0-9]*//g')
-    SCHEDS=$(cat /sys/block/$GAME_DISK_ROOT/queue/scheduler)
-    ORIG_SCHED=$(echo $SCHEDS | grep -oP '\[.*?\]' | sed 's/[][]//g')
-    SCHED_LIST=$(echo $SCHEDS | sed 's/[][]//g')
+    SCHEDS="/sys/block/$GAME_DISK_ROOT/queue/scheduler"
+    ORIG_SCHED=$(grep -oP '\[.*?\]' $SCHEDS | sed 's/[][]//g')
+    SCHED_LIST=$(tail $SCHEDS | sed 's/[][]//g')
     if [[ $ORIG_SCHED != "kyber" ]] && [[ $ORIG_SCHED != "bfq" ]];then
         SET_IOSCHD=1
         if [[ "$SCHED_LIST" == *"bfq"* ]];then
@@ -178,7 +178,7 @@ function detector() {
 function temp_control() {
 AMD_TEMP=$(sensors | grep -i "tctl" | cut -d'+' -f2 | cut -d"." -f1)
 AMD_BOOST=/sys/devices/system/cpu/cpufreq/boost
-AMD_BOOST_NOW=$(cat $AMD_BOOST)
+AMD_BOOST_NOW=$(tail $AMD_BOOST)
 INTEL_TEMP=0
     if [[ $1 != "" ]];then
     	echo "ensuring boost is enabled after game is closed"
@@ -249,7 +249,7 @@ do
 		
 		##this will only work on puppylinux based distros OR if you are not scared of root, GG
 		##we chek the current CPU governor and ensure it's set to performance
-		ORIG_GOVN=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+		ORIG_GOVN=$(tail /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 		if [ $ORIG_GOVN != "performance" ];then
 		    echo "Setting performance CPU governor"
 		    for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
