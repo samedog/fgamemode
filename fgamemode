@@ -7,10 +7,13 @@
 # This now runs on Pop!_OS
 # PUPPY = 1 PuppyLinux or pupy based distro
 # PUPPY = 2 POP!_OS
+# maybe i sould renice all spawns of a game? i dunno really since steam opens
+# more processes for a game than lutris or wine (directly using wine), maybe 
+# that will undermine the overall performance , gotta investigate on that
 
 INT='^[0-9]+$'
 DETECTED=""
-GAME_DATABASE="/usr/share/fgamemode/games.txt"
+GAME_DATABASE=$(</usr/share/fgamemode/games.txt)
 PID=""
 
 if [[ -f "/etc/os-release" ]]; then
@@ -40,7 +43,6 @@ function POWER_MIZER(){
 
 
 function DISK_detect(){
-    ##TODO: ADD DETECTION FOR C: D: AND SIMILAR DRIVE LETTERS
     GAME_PID="$1"
     EXEC_NAME="$2"
     EXEC_FLAG=0
@@ -60,7 +62,7 @@ function DISK_detect(){
         elif [[ "$GAME_PATH" == *"media"* ]];then
             GAME_DISK=$( echo $GAME_PATH | sed 's+/media/++g' | cut -d'/' -f 1 )
         else
-            #running on /, gotta determine what disk is "/" on
+            #running on /, gotta determine what drive is "/" on
             if [[ $PUPPY -eq 2 ]];then
             	GAME_DISK=$( grep -w "/" /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
             else
@@ -81,7 +83,7 @@ function DISK_detect(){
             done
             HDD_sched $GAME_DISK ## pass to hdd scheduler function
         else
-            echo "game running on a nvme sdd, no need for re-schedule"
+            echo "game running on a nvme ssd, no need for re-schedule"
             NVME=1
         fi
     else
@@ -90,6 +92,7 @@ function DISK_detect(){
     
 }
 function GPU_detect(){
+# TODO: add real detection for AMD and Intel GPUs 
     NV_prob_flag=0
     IT_prob_flag=0
     AMD_prob_flag=0
@@ -105,7 +108,8 @@ function GPU_detect(){
         echo "Probably using an AMD GPU"
         AMD_prob_flag=1
     else
-        echo "No acceleted GPU or open source driver(?)"
+        echo "No accelerated GPU or open source driver detected, terminating"
+        exit
     fi
 
     if [ $NV_prob_flag == 1 ];then
@@ -132,6 +136,7 @@ function HDD_sched(){
     SCHED_LIST=$(tail $SCHEDS | sed 's/[][]//g')
     if [[ $ORIG_SCHED != "kyber" ]] && [[ $ORIG_SCHED != "bfq" ]];then
         SET_IOSCHD=1
+        ## ordered by average performance based on lots of charts and youtube videos
         if [[ "$SCHED_LIST" == *"bfq"* ]];then
             echo "Setting I/O scheduler: bfq"
             echo bfq > /sys/block/"$GAME_DISK_ROOT"/queue/scheduler
@@ -151,6 +156,7 @@ function HDD_sched(){
 }
 
 function BINARY_type(){
+    ##is it a wine game or a linux game?
     EXEC_NAME="$1"
     if [[ "$EXEC_NAME" == *".exe"* ]];then
         EXEC_FLAG=2
@@ -160,23 +166,21 @@ function BINARY_type(){
 }
 
 function detector() {
-	#EXEC_NAME="$1"
-
-	    if [[ $GAME_EXEC == *".exe"  ]]; then
-		#echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
-		PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep "Z:" | grep -v log | awk '{print $1}')
-		if [[ $PID == "" ]];then
-		    PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep "C:" | grep -v log | awk '{print $1}')
-		fi
-	    else
-	    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
-		#echo "find_game_pid just found $PID for $EXEC_NAME"
-	    fi
-	    #echo "found PID: $PID"
-
+    if [[ $GAME_EXEC == *".exe"  ]]; then
+	#echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
+	#this omits any log spawned binary or tmp spawned binary to better pinpoint the
+	#game PID on multithreads
+	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':\\' | grep -v log | grep -v tmp | awk '{print $1}')
+    else
+    	#Usually linux native games spawn children in a way the PID is easily found 
+    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
+	#echo "find_game_pid just found $PID for $EXEC_NAME"
+    fi
+    #echo "found PID: $PID"
 }
 
 function temp_control() {
+#temp monitor because no one is happy with a blowed cpu right?
 AMD_TEMP=$(sensors | grep -i "tctl" | cut -d'+' -f2 | cut -d"." -f1)
 AMD_BOOST=/sys/devices/system/cpu/cpufreq/boost
 AMD_BOOST_NOW=$(tail $AMD_BOOST)
@@ -216,39 +220,30 @@ INTEL_TEMP=0
 
 GPU_detect
 
+##the main loop comes after the GPU detection because we don't need to redetect the GPU
+##on each loop run, also, it's very primitive but it does the job
 while true
 do
-#echo "entering: Wrapper"
-#####
-#temp monitor because no one is happy with a blowed cpu right?
-
-
-
-###
     if [ "$DETECTED" == "" ];then
         while IFS= read -r GAME
         do
             GAME_EXEC=$(echo $GAME | cut -d'|' -f1)
             GAME_NAME=$(echo $GAME | cut -d'|' -f2)
-	    #echo "trying to detect $GAME_EXEC $GAME_NAME"
             detector "$GAME_EXEC"
-            ###################
-	
+
 	    GAME_PID=$PID
 	    if [[ $GAME_PID =~ $INT ]] ; then
 		DETECTED="$GAME_NAME"
 		echo "$DETECTED detected entering game mode"
 		DISK_detect $GAME_PID $GAME_EXEC
 
-		## After some research Fallout 76 seems to be caught in a priority inversion issue
-		## so i'm adjusting some vaues manually instead the default ones
-		if echo $GAME_EXEC | grep -iqF "fallout76";then
+	        ## This is a placeholder for games with inverted priority issues (Fallout 76 WAS one)
+		 if echo $GAME_EXEC | grep -iqF "PriorityInversion";then
 		    PR_IN_FLAG=1
 		else
 		    PR_IN_FLAG=0
 		fi
 		
-		##this will only work on puppylinux based distros OR if you are not scared of root, GG
 		##we chek the current CPU governor and ensure it's set to performance
 		ORIG_GOVN=$(tail /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 		if [ $ORIG_GOVN != "performance" ];then
@@ -256,15 +251,18 @@ do
 		    for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
 			echo "performance" > "$i"/cpufreq/scaling_governor
 		    done
-		    SET_PERF=1 #so we get bac toprevious governor later
+		    SET_PERF=1 #so we can go back top revious governor later
 		else
 		    SET_PERF=0
 		fi
 		if [ $PR_IN_FLAG == 1 ];then
+		    ## renice to -5 worked wonders on inverted prio so i'm keeping it as default
+		    ## haven't seen any reports on protondb or proton github issue tracker for any other 
+		    ## games for now, and Fallout 76 was fixed some time ago
 		    echo "renicing $GAME_NAME to -5"
-		    renice -n -5 -p $GAME_PID
+		    renice -n 5 -p $GAME_PID
 		else
-		    ##renice the game process, default is renice to -15
+		    ##renice the game process, default is renice to -12
 		    echo "renicing $GAME_NAME to -20"
 		    renice -n -20 -p $GAME_PID
 		fi
@@ -299,11 +297,9 @@ do
 
 		##we set the program to realtime on highest priority, this plus bfq or kyber bumps the
 		##performance A LOT on mehcanical hdds 
-
-		WHOAMI=$(whoami)
 		
-		if [[ $WHOAMI == "root" ]] && [[ $NVME == 0 ]];then
-		    echo "setting ioprio to realtime" 
+		if [[ $NVME == 0 ]];then
+		    echo "setting ioprio" 
 		    ionice -c 1 -n 0 -p $GAME_PID
 		fi
 		
@@ -320,7 +316,8 @@ do
 	    fi
             #####################
             #sleep 0.2
-        done < "$GAME_DATABASE"
+        # we now read the variable instead of opening the file over and over 
+        done <<< "$GAME_DATABASE"
         sleep 5
     else
 	detector "$GAME"
@@ -345,7 +342,7 @@ do
             fi
             if [ $ISO_cpu == 1 ];then
                 echo "Reverting iso_cpu to default value 70"
-                echo 70 > /proc/sys/kernel/iso_cpu 
+                echo 70 > /proc/sys/kernel/iso_cpu
             fi
             if [ $GPU == "nvidia" ];then
                 echo "Reverting to original Power Mizer level"

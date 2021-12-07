@@ -25,3 +25,4 @@ eso64.exe|Elder Scrolls Online
 ForzaHorizon5.exe|Forza Horizon 5
 Cyberpunk2077.exe|Cyberpunk 2077
 Gw2-64.exe|Guild Wars 2
+Biomutant.exe|Biomutant
