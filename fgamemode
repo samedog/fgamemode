@@ -4,7 +4,7 @@
 # (www.gnu.org/licenses/old-licenses/gpl-2.0.html) e-mail: the.samedog[]gmail.com.
 # https://github.com/samedog/fgamemode
 ##########################################################################################
-# This now (barely) runs on Pop!_OS , currently fixing a lot of issues
+# This now runs on Pop!_OS
 # PUPPY = 1 PuppyLinux or pupy based distro
 # PUPPY = 2 POP!_OS
 
@@ -44,7 +44,7 @@ function DISK_detect(){
     GAME_PID="$1"
     EXEC_NAME="$2"
     EXEC_FLAG=0
-    if [ $PUPPY == 1 ]; then
+    if [[ $PUPPY -ne 0 ]] ; then
         BINARY_type $EXEC_NAME
         if [ $EXEC_FLAG == 2 ];then
             GAME_PATH=$(tail /proc/$GAME_PID/cmdline | cut -d':' -f'2')
@@ -53,6 +53,7 @@ function DISK_detect(){
         else
             GAME_PATH=$( tail /proc/$GAME_PID/cmdline)       
         fi
+        #echo "game path is: $GAME_PATH"
         
         if [[ "$GAME_PATH" == *"mnt"* ]];then
             GAME_DISK=$( echo $GAME_PATH | sed 's+/mnt/++g' | cut -d'/' -f 1 )
@@ -277,7 +278,7 @@ do
 		    if [ $PR_IN_FLAG == 1 ];then
 			TT_cpu=0
 		    else
-			echo "setting CPU sched to SCHED_NORMAL"
+			echo "setting CPU sched of game to SCHED_NORMAL"
 			schedtool -N $GAME_PID
 		    fi
 
