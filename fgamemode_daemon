@@ -31,10 +31,10 @@ fgamemode_start() {
 } 
 
 fgamemode_stop() {
-    PID=$(cat $PIDFILE 2>/dev/null)
+    PID=$(head $PIDFILE 2>/dev/null)
     kill -TERM $PID
     RUNNING=$(ps ax -o pid,cmd | grep -i $PID | grep -v grep)
-    if [ z $RUNNING ];then
+    if [ -z $RUNNING ];then
         echo "fgamemode stopped"
         rm -rf "$PIDFILE"
     fi
@@ -48,7 +48,7 @@ fgamemode_restart() {
 
 fgamemode_state() {
     PID_STATE=$(pgrep fgamemode)
-    PID_FILE_STATE=$(cat $PIDFILE 2>/dev/null) 
+    PID_FILE_STATE=$(head $PIDFILE 2>/dev/null) 
     if [[ -z $PID_STATE ]] || [[ -z $PID_FILE_STATE ]];then
         echo "daemon is stopped"
     else
