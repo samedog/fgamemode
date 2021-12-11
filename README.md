@@ -7,5 +7,5 @@ Requires ionice and renice (or equivalent busybox applets) and schedtool for SCH
 
 Quite similar to https://github.com/FeralInteractive/gamemode but running in the background with automatic detection.
 
-I'm currently adjusting the detection loop, for now i've gotten pretty good results using a 5 secs timer outside the parsing loop, this helps the daemon to use less cpu in detection mode in the long run. I'm still testing tho and adjustments will be done faster now since i finally was able to get my RTX 2060 to work on reverse prime mode.
+After some testing with cpu intensive games i decided to give de games a nice of -19 while giving -20 to the wineserver, i've seen improvements on long sessions on fallout76, cyberpunk 2077 and Forza Horizon 5 doing it so it will be defaulted for now.
 
