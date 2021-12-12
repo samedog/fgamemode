@@ -8,5 +8,4 @@ Works better with a MUQSS patched kernel (to provide SCHED_ISO) or Xanmod kernel
 
 Quite similar to https://github.com/FeralInteractive/gamemode but running in the background with automatic detection.
 
-After some testing with cpu intensive games i decided to give de games a nice of -19 while giving -20 to the wineserver, i've seen improvements on long sessions on fallout76, cyberpunk 2077 and Forza Horizon 5 doing it so it will be defaulted for now.
-
+After playing with the nice values for the game exec, wineserver, and the game threads under /proc/<pid>/task/ i've come to the conslusion that giving the exec the top priority while giving the wineserver and the game threads -10 hits the sweetspot: if wineserver has same or lower priority that pulseaudio (-11) theres some  really bothersome sound artifacting, and if the threads have lower priority than wineserver theres some rubber bandng and input lag, so overall i think game -20 and wineserver and threads -10 is just right for now.
