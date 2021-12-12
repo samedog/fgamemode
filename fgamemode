@@ -167,31 +167,40 @@ function BINARY_type(){
 
 function detector() {
     WINE_ARRAY=()
-    WINE_PID=0
+    threads=()
+    PID_ARRAY=()
     if [[ $GAME_EXEC == *".exe"  ]]; then
 	#echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
 	#this omits any log spawned binary or tmp spawned binary to better pinpoint the
 	#game PID on multithreads
 	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':\\' | grep -v -i "steam.exe" | grep -v log | grep -v tmp | awk '{print $1}')
     else
-    	#Usually linux native games spawn children in a way the PID is easily found 
     	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
-	#echo "find_game_pid just found $PID for $EXEC_NAME"
     fi
-    if [[ $PID != "" ]];then
+    if [[ $PID != "" ]] && [[ ! -z $PID ]];then
         #echo "found PID: $PID"
+        PID_ARRAY+=( $PID )
+        #we also renice the game threads
+        dir=$(dir /proc/$PID/task/)
         #looking for wineserver
         WINE_ARRAY+=$(ps ax | grep wineserver | grep -v grep | grep -v log | grep -v tmp | awk '{print $1}')
         for i in ${WINE_ARRAY[@]}
         do
             if [[ ${PID:0:2} -eq ${i:0:2} ]];then
                 #echo "$i is the wineserver of this game"
-                WINE_PID=$i
+                PID_ARRAY+=( $i )
             fi
         done
+        for i in $dir;
+        do
+            if [[ ! -z $i ]] ;then
+                PID_ARRAY+=( $i )
+            fi
+        done
+
     fi
 
-   
+  
 }
 
 function temp_control() {
@@ -210,16 +219,16 @@ INTEL_TEMP=0
 	fi
     else 
 	if [[ $AMD_TEMP -gt 0 ]];then
-            #97° is the safe spot (according to me) it means the temp is rapidly scaling
+            #95° is the safe spot (according to me) it means the temp is rapidly scaling
             #and may be approaching 100° which is no good at all, we can sacrifice a bit of
             #performance to keep the CPU safe.
-	    if [[ $AMD_TEMP -ge 97 ]] && [[ $AMD_BOOST_NOW -eq 1 ]];then
+	    if [[ $AMD_TEMP -ge 95 ]] && [[ $AMD_BOOST_NOW -eq 1 ]];then
 	    	#expect 10%~15% less performance if the game is multi-thread heavy
 	    	#I strongly believe this is quite a good trade off.
 	    	echo "disabling boost to avoid overheat or thermal throttling"
 	    	echo "0" > "$AMD_BOOST"
 	    fi
-	    #knowing my ryzen, 65° is a safe temp to turn boost on again it means the game is
+	    #knowing my ryzen, 70° is a safe temp to turn boost on again it means the game is
 	    #doing non heavy cpu stuff and we can afford to give more performance in exchange 
 	    #for some temp increase.
 	    if [[ $AMD_TEMP -lt 70  ]] && [[ $AMD_BOOST_NOW -eq 0 ]];then
@@ -246,7 +255,8 @@ do
             GAME_NAME=$(echo $GAME | cut -d'|' -f2)
             detector "$GAME_EXEC"
 
-	        GAME_PID=$PID
+	        GAME_PID=${PID_ARRAY[0]}
+	        
 	        if [[ $GAME_PID =~ $INT ]];then
 		    DETECTED="$GAME_NAME"
 		    echo "$DETECTED detected entering game mode"
@@ -277,11 +287,21 @@ do
 		        echo "renicing $GAME_NAME to -5"
 		        renice -n -5 -p $GAME_PID
 		    else
-		        ##renice the game process, default is renice to -19
-		        ##and it's wineserver to -20
-		        echo "renicing $GAME_NAME to -19 | and $WINE_PID to -20"
-		        renice -n -19 -p $GAME_PID
-		        renice -n -20 -p $WINE_PID
+		        ## renice the game process, default is renice to -20
+		        ## and it's  threads and wineserver to -10
+		        ## after some testing giving the game threads and wineserver
+		        ## more priority than pulseaudio cause too much glitching
+
+		        for (( i=0;i<${#PID_ARRAY[@]};i++ ))
+		        do
+		            if [[ $i -eq 0 ]];then
+	                    renice -n -20 -p ${PID_ARRAY[$i]}
+		            else
+	                    renice -n -10 -p ${PID_ARRAY[$i]}
+		            fi
+
+		        done
+
 		    fi
 
 		    ##if the kernel supports low-latency scheduling we use SCHED_ISO or SCHED_NORMAL
