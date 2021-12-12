@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 cp -rf ./fgamemode /usr/bin/fgamemode
 chmod +x /usr/bin/fgamemode
