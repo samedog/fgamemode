@@ -31,3 +31,4 @@ HorizonZeroDawn.exe|Horizon Zero Dawn
 mysummercar.exe|My Summer Car
 GreedFall.exe|GreedFall
 Frontiers.exe|Torchlight III
+eldenring.exe|Elden Ring
