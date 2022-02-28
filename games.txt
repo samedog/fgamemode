@@ -1,7 +1,7 @@
 Fallout76.exe|Fallout 76
 Warframe.x64.exe|Warframe
-Control_DX11.exe|Control
-Control_DX12.exe|Control
+Control_DX11.exe|Control (DX11)
+Control_DX12.exe|Control (DX12)
 Cq.bin.x86|Costume Quest
 EliteDangerous64.exe|Elite Dangerous
 Cq2|Costume Quest 2
@@ -14,15 +14,20 @@ MuseDash.exe|Muse Dash
 Neverinth.exe|Neverinth
 Outward.exe|Outward
 OxygenNotIncluded|Oxygen Not Included
-StardewValley.bin.x86_64|Stardew Valley
-StardewValley.bin.x86|Stardew Valley
+StardewValley.bin.x86_64|Stardew Valley (x64)
+StardewValley.bin.x86|Stardew Valley (x32)
 StateOfDecay2.exe|State Of Decay 2
 Super Animal Royale.exe|Super Animal Royale
-Torchlight2.bin.x86_64|Torchlight 2
-Torchlight2.bin.x86|Torchlight 2
+Torchlight2.bin.x86_64|Torchlight 2 (x86)
+Torchlight2.bin.x86|Torchlight 2 (x32)
 Zengeon.exe|Zengeon
 eso64.exe|Elder Scrolls Online
 ForzaHorizon5.exe|Forza Horizon 5
 Cyberpunk2077.exe|Cyberpunk 2077
 Gw2-64.exe|Guild Wars 2
 Biomutant.exe|Biomutant
+ACValhalla.exe|Assassin's Creed Valhalla
+HorizonZeroDawn.exe|Horizon Zero Dawn
+mysummercar.exe|My Summer Car
+GreedFall.exe|GreedFall
+Frontiers.exe|Torchlight III

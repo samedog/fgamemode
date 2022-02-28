@@ -33,7 +33,7 @@ fi
 
 function POWER_MIZER(){
     CURR_PO_MIZER=$(nvidia-settings -q [gpu]/GpuPowerMizerMode | grep -i attribute | rev | cut -d' ' -f1 | rev | sed 's/\.//g')
-    if [ $CURR_PO_MIZER -ne 1 ];then
+    if [[ $CURR_PO_MIZER -ne 1 ]];then
         nvidia-settings -a "GpuPowerMizerMode=1"
         SET_PWM=1
     else
@@ -48,7 +48,7 @@ function DISK_detect(){
     EXEC_FLAG=0
     if [[ $PUPPY -ne 0 ]] ; then
         BINARY_type $EXEC_NAME
-        if [ $EXEC_FLAG == 2 ];then
+        if [[ $EXEC_FLAG -eq 2 ]];then
             GAME_PATH=$(tail /proc/$GAME_PID/cmdline | cut -d':' -f'2')
             GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
             #echo "normalized $GAME_PATH"
@@ -97,7 +97,8 @@ function GPU_detect(){
     IT_prob_flag=0
     AMD_prob_flag=0
     GPU_probable_vendor="$(grep glx /var/log/Xorg.0.log | grep vendor) | grep -v \"X.Org\""
-    
+    GPU_kernel_message="$(dmesg | grep -i "graphics")"
+    #trying the fastest approach first
     if echo $GPU_probable_vendor | grep -iqF "nvidia";then
         echo "Probably using an NVIDIA GPU"
         NV_prob_flag=1
@@ -108,20 +109,23 @@ function GPU_detect(){
         echo "Probably using an AMD GPU"
         AMD_prob_flag=1
     else
-        echo "No accelerated GPU or open source driver detected, terminating"
+        #echo "No accelerated GPU or open source driver detected, terminating"
+	if [[ ${GPU_kernel_message,,} == *"intel graphics"* ]]  && [[ $IT_prob_flag -eq 0 ]];then
+	    echo "intel graphics kernel module is loaded but xorg driver is not loaded, terminating"
+	fi
         exit
     fi
 
-    if [ $NV_prob_flag == 1 ];then
+    if [[ $NV_prob_flag -eq 1 ]];then
         NV_try=$(nvidia-settings --v | grep "version")
         if echo $NV_try | grep -iqF "nvidia";then
             echo "Nvidia driver confirmed by nvidia-settings"
             GPU="nvidia"
         fi
-    elif [ $IT_prob_flag == 1 ];then
+    elif [[ $IT_prob_flag -eq 1 ]];then
         true
         ##to-do
-    elif [ $AMD_prob_flag == 1 ];then
+    elif [[ $AMD_prob_flag -eq 1 ]];then
         true
         ##to-do
     fi
@@ -170,20 +174,17 @@ function detector() {
     threads=()
     PID_ARRAY=()
     if [[ $GAME_EXEC == *".exe"  ]]; then
-	#echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
-	#this omits any log spawned binary or tmp spawned binary to better pinpoint the
-	#game PID on multithreads
-	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':\\' | grep -v -i "steam.exe" | grep -v log | grep -v tmp | awk '{print $1}')
-    else
-    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
-    fi
-    if [[ $PID != "" ]] && [[ ! -z $PID ]];then
-        #echo "found PID: $PID"
-        PID_ARRAY+=( $PID )
-        #we also renice the game threads
-        dir=$(dir /proc/$PID/task/)
-        #looking for wineserver
-        WINE_ARRAY+=$(ps ax | grep wineserver | grep -v grep | grep -v log | grep -v tmp | awk '{print $1}')
+        #echo "looking for $GAME_EXEC"
+	    #echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
+	    #this omits any log spawned binary or tmp spawned binary to better pinpoint the
+	    #game PID on multithreads
+	    PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':\\' | grep -v -i "steam.exe" | grep -v log | grep -v tmp | awk '{print $1}')
+	    #looking for wineserver
+	    
+	    if [[ -z $PID ]];then
+	        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':/' | grep -v -i "steam.exe" | grep -v log | grep -v tmp | awk '{print $1}')
+	    fi
+	    WINE_ARRAY+=$(ps ax | grep wineserver | grep -v grep | grep -v log | grep -v tmp | awk '{print $1}')
         for i in ${WINE_ARRAY[@]}
         do
             if [[ ${PID:0:2} -eq ${i:0:2} ]];then
@@ -191,6 +192,16 @@ function detector() {
                 PID_ARRAY+=( $i )
             fi
         done
+    else
+    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
+    fi
+    if [[ $PID != "" ]];then
+        #echo "found PID: $PID"
+        PID_ARRAY+=( $PID )
+        #we also renice the game threads
+        dir=$(dir /proc/$PID/task/)
+
+       
         for i in $dir;
         do
             if [[ ! -z $i ]] ;then
@@ -248,11 +259,12 @@ GPU_detect
 ##on each loop run, also, it's very primitive but it does the job
 while true
 do
-    if [ "$DETECTED" == "" ];then
+    if [[ "$DETECTED" == "" ]];then
         while IFS= read -r GAME
         do
             GAME_EXEC=$(echo $GAME | cut -d'|' -f1)
             GAME_NAME=$(echo $GAME | cut -d'|' -f2)
+
             detector "$GAME_EXEC"
 
 	        GAME_PID=${PID_ARRAY[0]}
@@ -271,7 +283,7 @@ do
 		    
 		    ##we chek the current CPU governor and ensure it's set to performance
 		    ORIG_GOVN=$(tail /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-		    if [ $ORIG_GOVN != "performance" ];then
+		    if [[ $ORIG_GOVN != "performance" ]];then
 		        echo "Setting performance CPU governor"
 		        for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
 			    echo "performance" > "$i"/cpufreq/scaling_governor
@@ -280,7 +292,7 @@ do
 		    else
 		        SET_PERF=0
 		    fi
-		    if [ $PR_IN_FLAG == 1 ];then
+		    if [[ $PR_IN_FLAG -eq 1 ]];then
 		        ## renice to -5 worked wonders on inverted prio so i'm keeping it as default
 		        ## haven't seen any reports on protondb or proton github issue tracker for any other 
 		        ## games for now
@@ -310,7 +322,7 @@ do
 		    SCHED_NORMAL=$(dmesg | grep -i "tt cpu")
 		    MuQSS=$(dmesg | grep -i muqss | grep -i Kolivas | cut -d' ' -f1)
 		    if [[ $SCHED_NORMAL == *"TT CPU"* ]];then
-		        if [ $PR_IN_FLAG == 1 ];then
+		        if [[ $PR_IN_FLAG -eq 1 ]];then
 			    TT_cpu=0
 		        else
 			    echo "setting CPU sched of game to SCHED_NORMAL"
@@ -318,12 +330,12 @@ do
 		        fi
 
 		    elif [[ $MuQSS == "MuQSS" ]];then
-		        if [ $PR_IN_FLAG == 1 ];then
+		        if [[ $PR_IN_FLAG -eq 1 ]];then
 			    ISO_cpu=0
 		        else
 			    echo "setting CPU sched to SCHED_ISO"
 			    schedtool -I $GAME_PID
-			    if [ "$?" -eq 0 ];then
+			    if [[ "$?" -eq 0 ]];then
 			        echo 95 > /proc/sys/kernel/iso_cpu
 			        ISO_cpu=1
 			    else
@@ -335,13 +347,13 @@ do
 		    ##we set the program to realtime on highest priority, this plus bfq or kyber bumps the
 		    ##performance A LOT on mehcanical hdds 
 		    
-		    if [[ $NVME == 0 ]];then
+		    if [[ $NVME -eq 0 ]];then
 		        echo "setting ioprio" 
 		        ionice -c 1 -n 0 -p $GAME_PID
 		    fi
 		    
 		    ## We set the powermizer level for nvidia gpus
-		    if [ $GPU == "nvidia" ];then
+		    if [[ $GPU -eq "nvidia" ]];then
 		        echo "setting Power Mizer to max performance" 
 		        POWER_MIZER
 		    fi
@@ -365,23 +377,23 @@ do
         else
             echo "$GAME_NAME closed"
             temp_control "on"
-            if [ $NVME == 0 ];then 
-                if [ $SET_IOSCHD == 1 ];then
+            if [[ $NVME -eq 0 ]];then 
+                if [[ $SET_IOSCHD -eq 1 ]];then
                     echo "Reverting to original I/O scheduler: $ORIG_SCHED"
                     echo $ORIG_SCHED > /sys/block/"$GAME_DISK_ROOT"/queue/scheduler
                 fi
             fi
-            if [ $SET_PERF == 1 ];then
+            if [[ $SET_PERF -eq 1 ]];then
                 echo "Reverting to original CPU governor: $ORIG_GOVN"
                 for i in `ls -d1 /sys/devices/system/cpu/cpu[0-9]*`; do
                     echo "$ORIG_GOVN" > "$i"/cpufreq/scaling_governor
                 done
             fi
-            if [ $ISO_cpu == 1 ];then
+            if [[ $ISO_cpu -eq 1 ]];then
                 echo "Reverting iso_cpu to default value 70"
                 echo 70 > /proc/sys/kernel/iso_cpu
             fi
-            if [ $GPU == "nvidia" ];then
+            if [[ $GPU == "nvidia" ]];then
                 echo "Reverting to original Power Mizer level"
                 nvidia-settings -a "[gpu]/GpuPowerMizerMode=$CURR_PO_MIZER"
             fi

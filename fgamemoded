@@ -1,0 +1,80 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          fgamemoded
+# Required-Start:    
+# Required-Stop:     
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: fgamemode daemon
+# Description:       fgamemode is a backgroun process that scans for games and applies configurations for them.
+### END INIT INFO
+PIDFILE="/var/run/fgamemode/fgamemode.pid"
+PID=$(pgrep -x fgamemode)
+
+fgamemode_start() {
+    
+    if [ ! -d "/var/log/fgamemode" ];then
+        mkdir /var/log/fgamemode
+    fi
+    if [ ! -d "/var/run/fgamemode" ];then
+        mkdir /var/run/fgamemode
+    fi
+    if [[ $PID =~ ^[0-9]+$ ]];then
+        echo "already running with PID: $PID"
+    else
+        /usr/bin/fgamemode 2>&1 > /var/log/fgamemode/log.txt &
+        PID=$(pgrep -x fgamemode)
+        echo "$PID" > "$PIDFILE"
+        echo "fgamemode started"
+    fi
+    
+} 
+
+fgamemode_stop() {
+    PID=$(head $PIDFILE 2>/dev/null)
+    kill -TERM $PID
+    RUNNING=$(ps ax -o pid,cmd | grep -i $PID | grep -v grep)
+    if [ -z $RUNNING ];then
+        echo "fgamemode stopped"
+        rm -rf "$PIDFILE"
+    fi
+}
+
+fgamemode_restart() {
+    fgamemode_stop
+    sleep 1
+    fgamemode_start
+}
+
+fgamemode_state() {
+    PID_STATE=$(pgrep fgamemode)
+    PID_FILE_STATE=$(head $PIDFILE 2>/dev/null) 
+    if [[ -z $PID_STATE ]] || [[ -z $PID_FILE_STATE ]];then
+        echo "daemon is stopped"
+    else
+        echo "daemon is running, PID: $PID_FILE_STATE"
+    fi
+}
+case "$1" in
+'start')
+  fgamemode_start
+  ;;
+'stop')
+  fgamemode_stop
+  ;;
+'restart')
+  fgamemode_restart
+  ;;
+'state')
+  fgamemode_state
+  ;;
+*)
+echo "Usage:"
+echo "/etc/init.d/fgamemode start       <<-- starts the fgamemode daemon"   
+echo "/etc/init.d/fgamemode stop        <<-- stops the fgamemode daemon"    
+echo "/etc/init.d/fgamemode restart     <<-- restarts the fgamemode daemon" 
+echo "/etc/init.d/fgamemode state       <<-- checks the fgamemode daemon"   
+  ;;
+
+esac 
+
