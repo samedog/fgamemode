@@ -32,3 +32,4 @@ mysummercar.exe|My Summer Car
 GreedFall.exe|GreedFall
 Frontiers.exe|Torchlight III
 eldenring.exe|Elden Ring
+ShadowOfTheTombRaider|Shadow Of The Tomb Raider

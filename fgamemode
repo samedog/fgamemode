@@ -53,15 +53,15 @@ function DISK_detect(){
             GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
             #echo "normalized $GAME_PATH"
         else
-            GAME_PATH=$( tail /proc/$GAME_PID/cmdline)       
+            GAME_PATH=$(tail /proc/$GAME_PID/cmdline)       
         fi
-        #echo "game path is: $GAME_PATH"
         
         if [[ "$GAME_PATH" == *"mnt"* ]];then
             GAME_DISK=$( echo $GAME_PATH | sed 's+/mnt/++g' | cut -d'/' -f 1 )
         elif [[ "$GAME_PATH" == *"media"* ]];then
             GAME_DISK=$( echo $GAME_PATH | sed 's+/media/++g' | cut -d'/' -f 1 )
         else
+            
             #running on /, gotta determine what drive is "/" on
             if [[ $PUPPY -eq 2 ]];then
             	GAME_DISK=$( grep -w "/" /etc/mtab | cut -d' ' -f1 | rev | cut -d'/' -f1 | rev )
@@ -81,7 +81,7 @@ function DISK_detect(){
                     GAME_DISK="$i"
                 fi
             done
-            HDD_sched $GAME_DISK ## pass to hdd scheduler function
+            HDD_sched "$GAME_DISK" ## pass to hdd scheduler function
         else
             echo "game running on a nvme ssd, no need for re-schedule"
             NVME=1
@@ -89,7 +89,7 @@ function DISK_detect(){
     else
         true
     fi
-    
+
 }
 function GPU_detect(){
 # TODO: add real detection for AMD and Intel GPUs 
@@ -109,10 +109,10 @@ function GPU_detect(){
         echo "Probably using an AMD GPU"
         AMD_prob_flag=1
     else
-        #echo "No accelerated GPU or open source driver detected, terminating"
-	if [[ ${GPU_kernel_message,,} == *"intel graphics"* ]]  && [[ $IT_prob_flag -eq 0 ]];then
-	    echo "intel graphics kernel module is loaded but xorg driver is not loaded, terminating"
-	fi
+        #this is just an informative message
+	    if [[ ${GPU_kernel_message,,} == *"intel graphics"* ]]  && [[ $IT_prob_flag -eq 0 ]];then
+	        echo "intel graphics kernel module is loaded but xorg driver is not loaded, terminating"
+	    fi
         exit
     fi
 
@@ -124,7 +124,9 @@ function GPU_detect(){
         fi
     elif [[ $IT_prob_flag -eq 1 ]];then
         true
-        ##to-do
+        #As far as i've observed on intel graphics as long as the CPU
+        #is set to high peformance so does the GPU so there's nothing 
+        #to do here
     elif [[ $AMD_prob_flag -eq 1 ]];then
         true
         ##to-do
@@ -134,6 +136,10 @@ function GPU_detect(){
 
 function HDD_sched(){
     GAME_DISK="$1"
+    if [[ $GAME_DISK != *sda* ]];then
+        GAME_DISK=$( mount | grep $GAME_DISK )
+        GAME_DISK=$( echo $GAME_DISK | cut -d' ' -f1 | cut -d'/' -f3 )
+    fi
     GAME_DISK_ROOT=$(echo $GAME_DISK | sed 's/[0-9]*//g')
     SCHEDS="/sys/block/$GAME_DISK_ROOT/queue/scheduler"
     ORIG_SCHED=$(grep -oP '\[.*?\]' $SCHEDS | sed 's/[][]//g')
@@ -182,7 +188,7 @@ function detector() {
 	    #looking for wineserver
 	    
 	    if [[ -z $PID ]];then
-	        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':/' | grep -v -i "steam.exe" | grep -v log | grep -v tmp | awk '{print $1}')
+	        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':/' | grep -v -i "steam.exe" | grep -v log | grep -v signalwrapper | grep -v tmp | awk '{print $1}')
 	    fi
 	    WINE_ARRAY+=$(ps ax | grep wineserver | grep -v grep | grep -v log | grep -v tmp | awk '{print $1}')
         for i in ${WINE_ARRAY[@]}
@@ -193,8 +199,9 @@ function detector() {
             fi
         done
     else
-    	PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | awk '{print $1}')
+	        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep -v .sh | grep -v log | grep -v signalwrapper | grep -v tmp | awk '{print $1}')
     fi
+    
     if [[ $PID != "" ]];then
         #echo "found PID: $PID"
         PID_ARRAY+=( $PID )
@@ -210,7 +217,6 @@ function detector() {
         done
 
     fi
-
   
 }
 
