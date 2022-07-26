@@ -1,5 +1,6 @@
 simple gamemode daemon for FrankenpupLinux and/or Puppy Linux and now it works on Pop!_OS too :D
 
+On POP!_OS run as "sudo ./install.sh"
 
 Works better with a MUQSS patched kernel (to provide SCHED_ISO) or Xanmod kernel (to provide SCHED_NORMAL) and aims to milk every single drop of performance the system can give.
 
