@@ -33,3 +33,5 @@ GreedFall.exe|GreedFall
 Frontiers.exe|Torchlight III
 eldenring.exe|Elden Ring
 ShadowOfTheTombRaider|Shadow Of The Tomb Raider
+SkyrimSE.exe|Skyrim Special Edition
+Fallout4.exe|Fallout 4

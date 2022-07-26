@@ -31,14 +31,92 @@ else
     exit
 fi
 
-function POWER_MIZER(){
-    CURR_PO_MIZER=$(nvidia-settings -q [gpu]/GpuPowerMizerMode | grep -i attribute | rev | cut -d' ' -f1 | rev | sed 's/\.//g')
-    if [[ $CURR_PO_MIZER -ne 1 ]];then
-        nvidia-settings -a "GpuPowerMizerMode=1"
-        SET_PWM=1
+#we first determine the active displays for all users
+declare -A DISPLAYS
+parse(){
+    while read line; do
+        screen=$(echo $line | cut -d' ' -f2)
+        if [[ $screen == *":"* ]];then
+           user=$(echo $line | cut -d' ' -f1)
+           #echo "$user|$screen"
+           DISPLAYS["$user"]=$screen
+        fi
+    done
+}
+
+parse < <(who)
+
+
+function detector() {
+    WINE_ARRAY=()
+    threads=()
+    PID_ARRAY=()
+    if [[ $GAME_EXEC == *".exe"  ]]; then
+	    #this omits any log, tmp, or proton spawned binary to better pinpoint the game PID
+	    PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':\\' | grep -v -i "steam.exe" | grep -v log | grep -v tmp | grep -v proton | awk '{print $1}')
+	    #some games/proton versions use another syntax so we try again
+	    if [[ -z $PID ]];then
+	        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':/' | grep -v -i "steam.exe" | grep -v log | grep -v signalwrapper | grep -v proton | grep -v tmp | awk '{print $1}')
+	    fi
+	    
+	    #final "sanity check" (i love if statements)
+	    if [[ ! -z $PID ]];then
+           # echo "found PID: $PID"
+            PID_ARRAY+=( $PID )
+            #steamtinkerlaunch allows for easy launcher customization and mod installation
+            #via external tools, and since it's widely used so i use it as a filter
+            STL=$(ps ax | grep -i "steamtinkerlaunch")
+	        if [[ ! -z $STL ]];then
+	            #Skyrim and fallout mods are a thing, s
+                WINESERVER=$(ps ax | grep "steamtinkerlaunch" | grep "wineserver" |  awk '{print $1}')
+                PID_ARRAY+=( $WINESERVER )
+            else  
+                WINE_ARRAY+=$(ps ax | grep wineserver | grep -v grep | grep -v log | grep -v tmp |  awk '{print $1}')
+                for i in ${WINE_ARRAY[@]}
+                do
+                    #echo "found pid $i"
+                    if [[ ${PID:0:2} -eq ${i:0:2} ]];then
+                        echo "$i is the wineserver of this game"
+                        PID_ARRAY+=( $i )
+                    fi
+                done
+            fi
+        fi
     else
-        SET_PWM=0
+        #linux native game detection
+        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep -v .sh | grep -v log | grep -v signalwrapper | grep -v tmp | awk '{print $1}')
     fi
+    
+    if [[ ! -z $PID ]];then
+        #   echo "we also renice the game threads"
+        dir=$(dir /proc/$PID/task/)
+        for d in $dir;
+        do
+            if [[ $d != "" ]] ;then
+                #echo "indexing $d"
+                PID_ARRAY+=( $d )
+            fi
+        done
+    fi
+}
+
+function POWER_MIZER(){
+    option=$1
+    prev_pm=$2
+    for key in ${!DISPLAYS[@]}; do
+        DSP=${DISPLAYS[${key}]}
+        CURR_PO_MIZER=$(sudo -u ${key} nvidia-settings -c $DSP -q [gpu]/GpuPowerMizerMode | grep -i attribute | rev | cut -d' ' -f1 | rev | sed 's/\.//g')
+        if [[ $option == "revert" ]];then 
+            sudo -u ${key} nvidia-settings -c $DSP -a "GpuPowerMizerMode=$prev_pm"
+        else
+            if [[ $CURR_PO_MIZER -ne 1 ]] || [[ $CURR_PO_MIZER != "1" ]];then
+                sudo -u ${key} nvidia-settings -c $DSP -a "GpuPowerMizerMode=1"
+                SET_PWM=1
+            else
+                SET_PWM=0
+            fi
+        fi
+    done
 }
 
 
@@ -51,7 +129,7 @@ function DISK_detect(){
         if [[ $EXEC_FLAG -eq 2 ]];then
             GAME_PATH=$(tail /proc/$GAME_PID/cmdline | cut -d':' -f'2')
             GAME_PATH=$(echo $GAME_PATH | sed 's+\\+/+g') #normalize
-            #echo "normalized $GAME_PATH"
+            echo "normalized $GAME_PATH"
         else
             GAME_PATH=$(tail /proc/$GAME_PID/cmdline)       
         fi
@@ -91,6 +169,8 @@ function DISK_detect(){
     fi
 
 }
+
+
 function GPU_detect(){
 # TODO: add real detection for AMD and Intel GPUs 
     NV_prob_flag=0
@@ -175,57 +255,13 @@ function BINARY_type(){
     fi  
 }
 
-function detector() {
-    WINE_ARRAY=()
-    threads=()
-    PID_ARRAY=()
-    if [[ $GAME_EXEC == *".exe"  ]]; then
-        #echo "looking for $GAME_EXEC"
-	    #echo "Dealing with a Steam/Wine/Lutris game, adjusting..."
-	    #this omits any log spawned binary or tmp spawned binary to better pinpoint the
-	    #game PID on multithreads
-	    PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':\\' | grep -v -i "steam.exe" | grep -v log | grep -v tmp | awk '{print $1}')
-	    #looking for wineserver
-	    
-	    if [[ -z $PID ]];then
-	        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep ':/' | grep -v -i "steam.exe" | grep -v log | grep -v signalwrapper | grep -v tmp | awk '{print $1}')
-	    fi
-	    WINE_ARRAY+=$(ps ax | grep wineserver | grep -v grep | grep -v log | grep -v tmp | awk '{print $1}')
-        for i in ${WINE_ARRAY[@]}
-        do
-            if [[ ${PID:0:2} -eq ${i:0:2} ]];then
-                #echo "$i is the wineserver of this game"
-                PID_ARRAY+=( $i )
-            fi
-        done
-    else
-	        PID=$(ps ax | grep "$GAME_EXEC" | grep -v grep | grep -v .sh | grep -v log | grep -v signalwrapper | grep -v tmp | awk '{print $1}')
-    fi
-    
-    if [[ $PID != "" ]];then
-        #echo "found PID: $PID"
-        PID_ARRAY+=( $PID )
-        #we also renice the game threads
-        dir=$(dir /proc/$PID/task/)
-
-       
-        for i in $dir;
-        do
-            if [[ ! -z $i ]] ;then
-                PID_ARRAY+=( $i )
-            fi
-        done
-
-    fi
-  
-}
-
 function temp_control() {
-#temp monitor because no one is happy with a blowed cpu right?
-AMD_TEMP=$(sensors | grep -i "tctl" | cut -d'+' -f2 | cut -d"." -f1)
-AMD_BOOST=/sys/devices/system/cpu/cpufreq/boost
-AMD_BOOST_NOW=$(tail $AMD_BOOST)
-INTEL_TEMP=0
+    #temp monitor because no one is happy with a blowed cpu right?
+    AMD_TEMP=$(sensors | grep -i "tctl" | cut -d'+' -f2 | cut -d"." -f1)
+    AMD_BOOST=/sys/devices/system/cpu/cpufreq/boost
+    AMD_BOOST_NOW=$(tail $AMD_BOOST)
+    INTEL_TEMP=0
+    
     if [[ $1 != "" ]];then
     	echo "ensuring boost is enabled after game is closed"
 	if [[ $AMD_TEMP -gt 0 ]];then
@@ -259,13 +295,29 @@ INTEL_TEMP=0
     fi
 }
 
+
+function renicer() {
+    PID_ARRY=( $@ )
+    for (( i=0;i<${#PID_ARRY[@]};i++ ))
+    do
+        #echo "renicing $1"
+        if [[ $i == "0" ]];then
+            renice -n -20 -p ${PID_ARRY[$i]} &> /dev/null
+        else
+            renice -n -10 -p ${PID_ARRY[$i]} &> /dev/null
+
+        fi
+    done
+}
+
 GPU_detect
+
 
 ##the main loop comes after the GPU detection because we don't need to redetect the GPU
 ##on each loop run, also, it's very primitive but it does the job
 while true
 do
-    if [[ "$DETECTED" == "" ]];then
+    if [[ -z $DETECTED ]];then
         while IFS= read -r GAME
         do
             GAME_EXEC=$(echo $GAME | cut -d'|' -f1)
@@ -306,20 +358,11 @@ do
 		        renice -n -5 -p $GAME_PID
 		    else
 		        ## renice the game process, default is renice to -20
-		        ## and it's  threads and wineserver to -10
+		        ## and it's threads and wineserver to -10
 		        ## after some testing giving the game threads and wineserver
 		        ## more priority than pulseaudio cause too much glitching
 
-		        for (( i=0;i<${#PID_ARRAY[@]};i++ ))
-		        do
-		            if [[ $i -eq 0 ]];then
-	                    renice -n -20 -p ${PID_ARRAY[$i]}
-		            else
-	                    renice -n -10 -p ${PID_ARRAY[$i]}
-		            fi
-
-		        done
-
+                renicer ${PID_ARRAY[@]} 
 		    fi
 
 		    ##if the kernel supports low-latency scheduling we use SCHED_ISO or SCHED_NORMAL
@@ -376,9 +419,14 @@ do
         sleep 5
     else
 	detector "$GAME"
-        if [[ $PID != "" ]] ; then
+        if [[ ! -z $PID ]] ; then
+            
             ##temp control only when a game is running
             temp_control
+            #we re-run  this part due to exes spawning and 
+            #despawning threads dynamically
+            detector "$GAME_NAME"
+            renicer ${PID_ARRAY[@]}
             sleep 5
         else
             echo "$GAME_NAME closed"
@@ -401,7 +449,7 @@ do
             fi
             if [[ $GPU == "nvidia" ]];then
                 echo "Reverting to original Power Mizer level"
-                nvidia-settings -a "[gpu]/GpuPowerMizerMode=$CURR_PO_MIZER"
+                POWER_MIZER "revert" $CURR_PO_MIZER
             fi
             echo "back into detection mode" 
             DETECTED=""

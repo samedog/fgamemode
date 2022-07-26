@@ -22,7 +22,7 @@ fgamemode_start() {
     if [[ $PID =~ ^[0-9]+$ ]];then
         echo "already running with PID: $PID"
     else
-        /usr/bin/fgamemode 2>&1 > /var/log/fgamemode/log.txt &
+        /usr/bin/fgamemode 2>&1> /var/log/fgamemode/log.txt &
         PID=$(pgrep -x fgamemode)
         echo "$PID" > "$PIDFILE"
         echo "fgamemode started"
