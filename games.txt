@@ -1,37 +1,50 @@
-Fallout76.exe|Fallout 76
-Warframe.x64.exe|Warframe
+AC3MP.exe|Assassins Creed III (MP)
+AC3SP.exe|Assassins Creed III (SP)
+AC4BFMP.exe|Assassins Creed IV: Black Flag (MP)
+AC4BFSP.exe|Assassins Creed IV: Black Flag (SP)
+ACOdyssey.exe|Assassins Creed: Odyssey
+ACOdyssey_plus.exe|Assassins Creed: Odyssey
+ACS.exe|Assassins Creed: Syndicate
+ACValhalla.exe|Assassin's Creed Valhalla
+APlagueTaleInnocence_x64.exe|A Plague Tale: Innocence
+AssassinsCreed3.exe|Assassins Creed III
+Biomutant.exe|Biomutant
 Control_DX11.exe|Control (DX11)
 Control_DX12.exe|Control (DX12)
 Cq.bin.x86|Costume Quest
-EliteDangerous64.exe|Elite Dangerous
 Cq2|Costume Quest 2
+Cyberpunk2077.exe|Cyberpunk 2077
+EliteDangerous64.exe|Elite Dangerous
 Empyrion.exe|Empyrion
-hollow_knight.x86_64|Hollow Knight
-kenshi_x64.exe|Kenshi
+Fallout4.exe|Fallout 4
+Fallout76.exe|Fallout 76
+ForzaHorizon5.exe|Forza Horizon 5
+Frontiers.exe|Torchlight III
+GreedFall.exe|GreedFall
+Gw2-64.exe|Guild Wars 2
+HorizonZeroDawn.exe|Horizon Zero Dawn
+KingdomCome.exe|Kingdom Come: Deliverance
 LC2.exe|Lara Croft and the Temple of Osiris
 MewnBase.exe|MewnBase
 MuseDash.exe|Muse Dash
 Neverinth.exe|Neverinth
 Outward.exe|Outward
 OxygenNotIncluded|Oxygen Not Included
+ShadowOfTheTombRaider|Shadow Of The Tomb Raider
+SkyrimSE.exe|Skyrim Special Edition
 StardewValley.bin.x86_64|Stardew Valley (x64)
 StardewValley.bin.x86|Stardew Valley (x32)
 StateOfDecay2.exe|State Of Decay 2
 Super Animal Royale.exe|Super Animal Royale
 Torchlight2.bin.x86_64|Torchlight 2 (x86)
 Torchlight2.bin.x86|Torchlight 2 (x32)
+Warframe.x64.exe|Warframe
+WatchDogsLegion.exe|Watch Dogs: Legion
+WatchDogsLegion_BE.exe|Watch Dogs: Legion (BattleEye)
 Zengeon.exe|Zengeon
-eso64.exe|Elder Scrolls Online
-ForzaHorizon5.exe|Forza Horizon 5
-Cyberpunk2077.exe|Cyberpunk 2077
-Gw2-64.exe|Guild Wars 2
-Biomutant.exe|Biomutant
-ACValhalla.exe|Assassin's Creed Valhalla
-HorizonZeroDawn.exe|Horizon Zero Dawn
-mysummercar.exe|My Summer Car
-GreedFall.exe|GreedFall
-Frontiers.exe|Torchlight III
 eldenring.exe|Elden Ring
-ShadowOfTheTombRaider|Shadow Of The Tomb Raider
-SkyrimSE.exe|Skyrim Special Edition
-Fallout4.exe|Fallout 4
+eso64.exe|Elder Scrolls Online
+hollow_knight.x86_64|Hollow Knight
+kenshi_x64.exe|Kenshi
+mysummercar.exe|My Summer Car
+ZoneUE4.exe|Mutant Year Zero: Road to Eden 
